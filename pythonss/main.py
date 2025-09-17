@@ -120,7 +120,7 @@ def background_task():
             else:
                 print("Skipping send, one or both data sources are not available.")
             
-            time.sleep(600)
+            time.sleep(60)
     except Exception as e:
         print("Error in background task:", e)
     finally:
