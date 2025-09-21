@@ -5,8 +5,7 @@ import json
 import time
 import threading
 from flask import Flask, jsonify
-import mysql.connector
-from mysql.connector import Error
+
 
 # =========================
 # Environment Variables
@@ -18,12 +17,6 @@ CITY = os.getenv("CITY", "Jabalpur")  # default Jabalpur if not set
 MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "broker.hivemq.com")
 MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", 1883))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "esp32/sensor")
-
-# MySQL Credentials (put in Render environment variables for security)
-MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
-MYSQL_USER = os.getenv("MYSQL_USER", "root")
-MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
-MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "rain_prediction")
 
 # =========================
 # Global Variables
@@ -97,43 +90,6 @@ def send_data_to_google_sheets(sensor_data, api_data):
         if 'response' in locals() and response:
             print(f"Response Content: {response.text}")
 
-# =========================
-# Send data to MySQL
-# =========================
-def send_data_to_mysql(sensor_data, api_data):
-    if sensor_data is None or api_data is None:
-        print("Data is incomplete, skipping send to MySQL.")
-        return
-
-    try:
-        conn = mysql.connector.connect(
-            host=MYSQL_HOST,
-            user=MYSQL_USER,
-            password=MYSQL_PASSWORD,
-            database=MYSQL_DATABASE
-        )
-        cursor = conn.cursor()
-        query = """
-            INSERT INTO rain_data (sensor_temp, sensor_hum, sensor_pres, 
-                                   api_temp, api_hum, api_pres, api_weather, timestamp)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-        """
-        values = (
-            sensor_data.get("temp", 0),
-            sensor_data.get("hum", 0),
-            sensor_data.get("pres", 0),
-            api_data["main"].get("temp", 0),
-            api_data["main"].get("humidity", 0),
-            api_data["main"].get("pressure", 0),
-            api_data["weather"][0].get("main", "N/A"),
-        )
-        cursor.execute(query, values)
-        conn.commit()
-        cursor.close()
-        conn.close()
-        print("Data inserted into MySQL successfully.")
-    except Error as e:
-        print("Error inserting into MySQL:", e)
 
 # =========================
 # Background Task
@@ -162,12 +118,11 @@ def background_task():
             
             if latest_sensor_data and api_data:
                 send_data_to_google_sheets(latest_sensor_data, api_data)
-                send_data_to_mysql(latest_sensor_data, api_data)
                 latest_sensor_data = None
             else:
                 print("Skipping send, one or both data sources are not available.")
             
-            time.sleep(60)
+            time.sleep(40)
     except Exception as e:
         print("Error in background task:", e)
     finally:
